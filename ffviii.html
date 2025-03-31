@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Triple Triad Prototype – Updated</title>
+  <style>
+    body {
+      background: radial-gradient(circle, #444 20%, #111 100%);
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    h1 {
+      margin-bottom: 10px;
+      font-family: "Verdana", sans-serif;
+      font-size: 1.5em;
+      color: #ffcc00;
+    }
+    #controls {
+      margin-bottom: 10px;
+    }
+    #controls label {
+      margin-right: 15px;
+      font-size: 0.9em;
+    }
+    button {
+      padding: 5px 10px;
+      font-size: 1em;
+      border: none;
+      border-radius: 3px;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #555;
+    }
+
+    /* Center the board in a flex container */
+    #board-container {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+
+    /* Board styling – bigger grid cells (120×120) */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 120px);
+      grid-template-rows: repeat(3, 120px);
+      gap: 3px;
+      background: #000;
+      padding: 3px;
+    }
+    .cell {
+      width: 120px;
+      height: 120px;
+      background: #7A5230; /* Brown board cell */
+      position: relative;
+    }
+
+    /* Hand containers */
+    #player2-hand, #player1-hand {
+      display: flex;
+      justify-content: center;
+      margin: 10px 0;
+    }
+
+    /* Larger cards: 120×150 */
+    .card {
+      width: 120px;
+      height: 150px;
+      background: #f0e6d2; /* Light card background */
+      border: 2px solid #333;
+      border-radius: 5px;
+      margin: 0 5px;
+      position: relative;
+      user-select: none;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .card.blue { border-color: #3399FF; }  /* Blue border for Player 1 */
+    .card.red  { border-color: #FF4444; }  /* Red border for Player 2 */
+    .card.selected {
+      outline: 3px solid #ffff00;
+      outline-offset: -3px;
+    }
+
+    /* Faint placeholder image behind the text */
+    .card .art {
+      position: absolute;
+      top: 30px;
+      left: 25px;
+      width: 70px;
+      height: 70px;
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .card .level {
+      position: absolute;
+      top: 0; left: 2px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #000;
+      background: #ccc;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+    .card .value {
+      position: absolute;
+      font-weight: bold;
+      color: #000;
+    }
+    .card .top    { top: 2px; left: 50%; transform: translateX(-50%); }
+    .card .bottom { bottom: 18px; left: 50%; transform: translateX(-50%); }
+    .card .left   { left: 4px; top: 50%; transform: translateY(-50%); }
+    .card .right  { right: 4px; top: 50%; transform: translateY(-50%); }
+    .card .name {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      line-height: 1.2em;
+    }
+
+    #status {
+      margin: 10px 0;
+      font-size: 1em;
+    }
+    #status .turn {
+      font-weight: bold;
+      margin-right: 20px;
+    }
+    #status .score {
+      font-weight: bold;
+    }
+    #result {
+      font-size: 1.2em;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Final Fantasy VIII – Triple Triad Demo (Updated)</h1>
+
+<div id="controls">
+  <label><input type="checkbox" id="rule-same"> Same</label>
+  <label><input type="checkbox" id="rule-plus"> Plus</label>
+  <label><input type="checkbox" id="rule-combo"> Combo</label>
+  <label><input type="checkbox" id="toggle-ai"> AI Opponent</label>
+  <button id="restart-btn">Restart Game</button>
+</div>
+
+<!-- Player 2 (opponent) hand at the top -->
+<div id="player2-hand"></div>
+
+<!-- Centered board container -->
+<div id="board-container">
+  <div id="board">
+    <!-- 3×3 board cells -->
+    <div class="cell" data-pos="0"></div>
+    <div class="cell" data-pos="1"></div>
+    <div class="cell" data-pos="2"></div>
+    <div class="cell" data-pos="3"></div>
+    <div class="cell" data-pos="4"></div>
+    <div class="cell" data-pos="5"></div>
+    <div class="cell" data-pos="6"></div>
+    <div class="cell" data-pos="7"></div>
+    <div class="cell" data-pos="8"></div>
+  </div>
+</div>
+
+<!-- Player 1 (you) hand at the bottom -->
+<div id="player1-hand"></div>
+
+<div id="status">
+  <span class="turn" id="turn-indicator">Turn: Blue</span>
+  <span class="score" id="score-display">Blue: 0, Red: 0</span>
+  <div id="result"></div>
+</div>
+
+<script>
+  // --- SAMPLE CARD DATA ---
+  const cards = [
+    { name: "Geezard", level: 1, values: [1, 5, 1, 3] },
+    { name: "Funguar", level: 1, values: [3, 1, 1, 5] },
+    { name: "Bite Bug", level: 1, values: [1, 3, 5, 2] },
+    { name: "Red Bat", level: 2, values: [2, 4, 1, 6] },
+    { name: "Blobra", level: 3, values: [4, 4, 2, 5] },
+    { name: "Gayla", level: 3, values: [2, 1, 6, 4] },
+    { name: "Wendigo", level: 4, values: [6, 5, 3, 1] },
+    { name: "Cactuar", level: 5, values: [2, 8, 3, 8] },
+    { name: "Ifrit", level: 8, values: [9, 8, 6, 2] },
+    { name: "Elvoret", level: 6, values: [5, 7, 4, 7] },
+    { name: "Chimera", level: 7, values: [7, 6, 8, 5] },
+    { name: "Squall", level: 10, values: [10, 6, 9, 4] }
+  ];
+
+  let board = [ [null,

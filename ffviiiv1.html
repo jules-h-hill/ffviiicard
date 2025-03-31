@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Triple Triad Prototype</title>
+  <style>
+    body {
+      background: radial-gradient(circle, #444 20%, #111 100%);
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    h1 {
+      margin-bottom: 10px;
+      font-family: "Verdana", sans-serif;
+      font-size: 1.5em;
+      color: #ffcc00;
+    }
+    #controls {
+      margin-bottom: 10px;
+    }
+    #controls label {
+      margin-right: 15px;
+      font-size: 0.9em;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 2px;
+      background: #000;
+      padding: 2px;
+      margin: 0 auto 10px auto;
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: #7A5230; /* Brown board cell */
+      position: relative;
+    }
+    /* Hand containers */
+    #player2-hand, #player1-hand {
+      display: flex;
+      justify-content: center;
+      margin: 10px 0;
+    }
+    .card {
+      width: 80px;
+      height: 100px;
+      background: #f0e6d2; /* Light card background */
+      border: 2px solid #333;
+      border-radius: 5px;
+      margin: 0 5px;
+      position: relative;
+      user-select: none;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .card.blue { border-color: #3399FF; }   /* Blue border for Player 1 */
+    .card.red  { border-color: #FF4444; }   /* Red border for Player 2 */
+    .card.selected {
+      outline: 3px solid #ffff00;
+      outline-offset: -3px;
+    }
+    .card .name {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      line-height: 1.2em;
+    }
+    .card .value {
+      position: absolute;
+      font-weight: bold;
+      color: #000;
+    }
+    .card .top    { top: 2px; left: 50%; transform: translateX(-50%); }
+    .card .bottom { bottom: 14px; left: 50%; transform: translateX(-50%); }
+    .card .left   { left: 4px; top: 50%; transform: translateY(-50%); }
+    .card .right  { right: 4px; top: 50%; transform: translateY(-50%); }
+    .card .level {
+      position: absolute;
+      top: 0; left: 2px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #000;
+      background: #ccc;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+    #status {
+      margin: 10px 0;
+      font-size: 1em;
+    }
+    #status .turn {
+      font-weight: bold;
+      margin-right: 20px;
+    }
+    #status .score {
+      font-weight: bold;
+    }
+    #result {
+      font-size: 1.2em;
+      margin-top: 5px;
+    }
+    button {
+      padding: 5px 10px;
+      font-size: 1em;
+      border: none;
+      border-radius: 3px;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #555;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Final Fantasy VIII – Triple Triad Demo</h1>
+
+<div id="controls">
+  <label><input type="checkbox" id="rule-same"> Same</label>
+  <label><input type="checkbox" id="rule-plus"> Plus</label>
+  <label><input type="checkbox" id="rule-combo"> Combo</label>
+  <label><input type="checkbox" id="toggle-ai"> AI Opponent</label>
+  <button id="restart-btn">Restart Game</button>
+</div>
+
+<div id="player2-hand"></div>
+<div id="board">
+  <!-- 3x3 board cells -->
+  <div class="cell" data-pos="0"></div>
+  <div class="cell" data-pos="1"></div>
+  <div class="cell" data-pos="2"></div>
+  <div class="cell" data-pos="3"></div>
+  <div class="cell" data-pos="4"></div>
+  <div class="cell" data-pos="5"></div>
+  <div class="cell" data-pos="6"></div>
+  <div class="cell" data-pos="7"></div>
+  <div class="cell" data-pos="8"></div>
+</div>
+<div id="player1-hand"></div>
+
+<div id="status">
+  <span class="turn" id="turn-indicator">Turn: Blue</span>
+  <span class="score" id="score-display">Blue: 0, Red: 0</span>
+  <div id="result"></div>
+</div>
+
+<script>
+  // --- Game Data Definitions ---
+  const cards = [
+    { name: "Geezard", level: 1, values: [1, 5, 1, 3] },
+    { name: "Funguar", level: 1, values: [3, 1, 1, 5] },
+    { name: "Bite Bug", level: 1, values: [1, 3, 5, 2] },
+    { name: "Red Bat", level: 2, values: [2, 4, 1, 6] },
+    { name: "Blobra", level: 3, values: [4, 4, 2, 5] },
+    { name: "Gayla", level: 3, values: [2, 1, 6, 4] },
+    { name: "Wendigo", level: 4, values: [6, 5, 3, 1] },
+    { name: "Cactuar", level: 5, values: [2, 8, 3, 8] },
+    { name: "Ifrit", level: 8, values: [9, 8, 6, 2] },
+    { name: "Elvoret", level: 6, values: [5, 7, 4, 7] },
+    { name: "Chimera", level: 7, values: [7, 6, 8, 5] },
+    { name: "Squall", level: 10, values: [10, 6, 9, 4] }
+  ];
+  // Note: 10 is represented as 'A' when displaying values on cards.
+  
+  let board = [];        // 3x3 board array (matrix) to hold placed cards or null
+  let player1Hand = [];  // cards for player 1 (Blue)
+  let player2Hand = [];  // cards for player 2 (Red)
+  let currentPlayer = 1; // 1 = Blue, 2 = Red
+  let gameActive = true;
+  let selectedCard = null; // currently selected card object (from current player's hand)
+  
+  // Helper: check rule toggles
+  function isSameRule()  { return document.getElementById("rule-same").checked; }
+  function isPlusRule()  { return document.getElementById("rule-plus").checked; }
+  function isComboRule() { return document.getElementById("rule-combo").checked; }
+  function isAiOpponent() { return document.getElementById("toggle-ai").checked; }
+  
+  // DOM elements for quick access
+  const boardElement = document.getElementById("board");
+  const player1HandElement = document.getElementById("player1-hand");
+  const player2HandElement = document.getElementById("player2-hand");
+  const turnIndicator = document.getElementById("turn-indicator");
+  const scoreDisplay = document.getElementById("score-display");
+  const resultDisplay = document.getElementById("result");
+  
+  // --- Game Setup and Reset ---
+  function initGame() {
+    // Clear previous state
+    board = [ [null, null, null], [null, null, null], [null, null, null] ];
+    player1Hand = [];
+    player2Hand = [];
+    selectedCard = null;
+    gameActive = true;
+    resultDisplay.textContent = "";
+  
+    // Reset card ownership
+    cards.forEach(card => { card.owner = null; });
+  
+    // Shuffle the deck and deal 5 random cards to each player
+    const deck = cards.slice();                  // copy cards
+    deck.sort(() => Math.random() - 0.5);        // shuffle
+    player1Hand = deck.slice(0, 5);
+    player2Hand = deck.slice(5, 10);
+    player1Hand.forEach(card => { card.owner = 1; });
+    player2Hand.forEach(card => { card.owner = 2; });
+  
+    // Decide starting player randomly (coin flip)
+    currentPlayer = (Math.random() < 0.5) ? 1 : 2;
+  
+    // Render the hands on the UI
+    renderHands();
+    updateTurnIndicator();
+    updateScore();
+  
+    // If AI is enabled and it's AI's turn first, trigger AI move after a short delay
+    if (gameActive && currentPlayer === 2 && isAiOpponent()) {
+      setTimeout(aiMove, 500);
+    }
+  }
+  
+  function renderHands() {
+    // Clear existing hand display
+    player1HandElement.innerHTML = "";
+    player2HandElement.innerHTML = "";
+    // Create card elements for each card in Player 2's hand (top)
+    player2Hand.forEach(card => {
+      const cardElem = createCardElement(card);
+      player2HandElement.appendChild(cardElem);
+    });
+    // Create card elements for each card in Player 1's hand (bottom)
+    player1Hand.forEach(card => {
+      const cardElem = createCardElement(card);
+      player1HandElement.appendChild(cardElem);
+    });
+  }
+  
+  function createCardElement(card) {
+    // Create a div representing the card
+    const cardDiv = document.createElement("div");
+    cardDiv.classList.add("card", card.owner === 1 ? "blue" : "red");
+    cardDiv.dataset.cardIndex = cards.indexOf(card);
+    // Prepare values (use 'A' for 10)
+    const [topVal, rightVal, bottomVal, leftVal] = card.values.map(v => v === 10 ? "A" : v);
+    // Set the inner HTML for the card (values and name)
+    cardDiv.innerHTML = `
+      <div class="level">Lv${card.level}</div>
+      <div class="value top">${topVal}</div>
+      <div class="value right">${rightVal}</div>
+      <div class="value bottom">${bottomVal}</div>
+      <div class="value left">${leftVal}</div>
+      <div class="name">${card.name}</div>
+    `;
+    // Click event to select the card
+    cardDiv.addEventListener("click", () => {
+      if (!gameActive) return;
+      if (card.owner !== currentPlayer) return;           // only allow selecting your own cards on your turn
+      if (currentPlayer === 2 && isAiOpponent()) return;  // if AI's turn, ignore clicks
+      // Toggle selection highlight
+      if (selectedCard === card) {
+        // Deselect if clicking the same card again
+        selectedCard = null;
+        cardDiv.classList.remove("selected");
+      } else {
+        // Select this card (and deselect any other)
+        deselectAllCards();
+        selectedCard = card;
+        cardDiv.classList.add("selected");
+      }
+    });
+    return cardDiv;
+  }
+  
+  function deselectAllCards() {
+    document.querySelectorAll(".card.selected").forEach(elem => {
+      elem.classList.remove("selected");
+    });
+    selectedCard = null;
+  }
+  
+  // --- Game Logic: Placing Cards and Flipping Mechanics ---
+  
+  // Attach click events to board cells for placing cards
+  document.querySelectorAll("#board .cell").forEach(cell => {
+    cell.addEventListener("click", () => {
+      if (!gameActive) return;
+      const pos = parseInt(cell.dataset.pos);
+      const row = Math.floor(pos / 3);
+      const col = pos % 3;
+      if (!selectedCard) return;                        // need a card selected
+      if (currentPlayer !== selectedCard.owner) return; // ensure the selected card belongs to current player
+      if (board[row][col] !== null) return;             // must click an empty cell
+      // Place the selected card
+      placeCard(selectedCard, row, col);
+    });
+  });
+  
+  function placeCard(card, row, col) {
+    // Remove card from the player's hand list
+    if (card.owner === 1) {
+      player1Hand = player1Hand.filter(c => c !== card);
+    } else if (card.owner === 2) {
+      player2Hand = player2Hand.filter(c => c !== card);
+    }
+    // Put the card on the board
+    board[row][col] = card;
+    // Move the card's DOM element from hand to board cell
+    const cellElem = document.querySelector(`.cell[data-pos="${row*3 + col}"]`);
+    const cardElem = document.querySelector(`.card[data-card-index="${cards.indexOf(card)}"]`);
+    if (cellElem && cardElem) {
+      cardElem.classList.remove("selected");    // remove highlight
+      cardElem.style.cursor = "default";
+      cellElem.appendChild(cardElem);           // append card to the board cell
+      cardElem.style.margin = "auto";           // center it (since cell is 100x100, card is 80x100 with auto margin)
+    }
+    // Apply flip rules (captures) as a result of placing this card
+    applyFlipRules(card, row, col);
+    updateScore();
+    // Check for game end (board full or no cards left)
+    if (isBoardFull() || (player1Hand.length === 0 && player2Hand.length === 0)) {
+      endGame();
+      return;
+    }
+    // Switch turn to the other player
+    currentPlayer = (currentPlayer === 1 ? 2 : 1);
+    updateTurnIndicator();
+    // Deselect the card now that it's placed
+    selectedCard = null;
+    // If the new current player is AI, have the AI play after a short delay
+    if (currentPlayer === 2 && isAiOpponent()) {
+      setTimeout(aiMove, 500);
+    }
+  }
+  
+  function applyFlipRules(placedCard, row, col) {
+    const owner = placedCard.owner;
+    // Gather all neighboring cards around (row, col)
+    const neighbors = [];
+    // Up neighbor
+    if (row > 0 && board[row-1][col]) {
+      neighbors.push({
+        card: board[row-1][col],
+        placedSide: placedCard.values[0],          // placed card's top value
+        neighborSide: board[row-1][col].values[2]  // neighbor's bottom value
+      });
+    }
+    // Down neighbor
+    if (row < 2 && board[row+1][col]) {
+      neighbors.push({
+        card: board[row+1][col],
+        placedSide: placedCard.values[2],          // placed card's bottom value
+        neighborSide: board[row+1][col].values[0]  // neighbor's top value
+      });
+    }
+    // Left neighbor
+    if (col > 0 && board[row][col-1]) {
+      neighbors.push({
+        card: board[row][col-1],
+        placedSide: placedCard.values[3],          // placed card's left value
+        neighborSide: board[row][col-1].values[1]  // neighbor's right value
+      });
+    }
+    // Right neighbor
+    if (col < 2 && board[row][col+1]) {
+      neighbors.push({
+        card: board[row][col+1],
+        placedSide: placedCard.values[1],          // placed card's right value
+        neighborSide: board[row][col+1].values[3]  // neighbor's left value
+      });
+    }
+  
+    const toFlipSpecial = [];  // cards to flip via Same/Plus rules
+    const toFlipNormal = [];   // cards to flip via basic rule
+  
+    // Check Same rule
+    if (isSameRule()) {
+      const sameMatches = neighbors.filter(n => n.placedSide === n.neighborSide);
+      if (sameMatches.length >= 2) {  // needs at least two matches
+        sameMatches.forEach(n => {
+          if (n.card.owner !== owner) {
+            toFlipSpecial.push(n.card);
+          }
+        });
+      }
+    }
+    // Check Plus rule
+    if (isPlusRule()) {
+      for (let i = 0; i < neighbors.length; i++) {
+        for (let j = i + 1; j < neighbors.length; j++) {
+          const sum1 = neighbors[i].placedSide + neighbors[i].neighborSide;
+          const sum2 = neighbors[j].placedSide + neighbors[j].neighborSide;
+          if (sum1 === sum2) {
+            if (neighbors[i].card.owner !== owner) {
+              toFlipSpecial.push(neighbors[i].card);
+            }
+            if (neighbors[j].card.owner !== owner) {
+              toFlipSpecial.push(neighbors[j].card);
+            }
+          }
+        }
+      }
+    }
+    // Check basic rule for each neighbor
+    neighbors.forEach(n => {
+      if (n.card.owner !== owner && n.placedSide > n.neighborSide) {
+        if (!toFlipSpecial.includes(n.card)) {  // avoid double-flipping same card
+          toFlipNormal.push(n.card);
+        }
+      }
+    });
+  
+    // Perform flips for special (Same/Plus) captures
+    const comboFlipList = [];  // track cards flipped by Same/Plus for potential Combo
+    toFlipSpecial.forEach(card => {
+      if (card.owner !== owner) {       // flip only opponent's cards
+        flipCard(card, owner);
+        comboFlipList.push(card);
+      }
+    });
+    // Perform flips for normal captures
+    toFlipNormal.forEach(card => {
+      if (card.owner !== owner) {
+        flipCard(card, owner);
+        // (Note: we do not add normal flips to comboFlipList because Combo triggers only from special flips)
+      }
+    });
+    // Combo rule: cascade flips from any special flips
+    if (isComboRule() && comboFlipList.length > 0) {
+      applyComboChain(comboFlipList, owner);
+    }
+  }
+  
+  function flipCard(card, newOwner) {
+    // Change the ownership of the card and update its appearance
+    card.owner = newOwner;
+    const cardElem = document.querySelector(`.card[data-card-index="${cards.indexOf(card)}"]`);
+    if (cardElem) {
+      cardElem.classList.remove("blue", "red");
+      cardElem.classList.add(newOwner === 1 ? "blue" : "red");
+    }
+  }
+  
+  function applyComboChain(flippedCards, owner) {
+    // For each card just flipped by Same/Plus, check its neighbors for Combo flips
+    const newFlips = [];
+    flippedCards.forEach(card => {
+      const posIndex = findCardOnBoard(card);
+      if (posIndex === -1) return;
+      const r = Math.floor(posIndex / 3);
+      const c = posIndex % 3;
+      // Check all adjacent cards around this card
+      if (r > 0 && board[r-1][c] && board[r-1][c].owner !== owner) {
+        // Up neighbor
+        if (card.values[0] > board[r-1][c].values[2]) {
+          newFlips.push(board[r-1][c]);
+          flipCard(board[r-1][c], owner);
+        }
+      }
+      if (r < 2 && board[r+1][c] && board[r+1][c].owner !== owner) {
+        // Down neighbor
+        if (card.values[2] > board[r+1][c].values[0]) {
+          newFlips.push(board[r+1][c]);
+          flipCard(board[r+1][c], owner);
+        }
+      }
+      if (c > 0 && board[r][c-1] && board[r][c-1].owner !== owner) {
+        // Left neighbor
+        if (card.values[3] > board[r][c-1].values[1]) {
+          newFlips.push(board[r][c-1]);
+          flipCard(board[r][c-1], owner);
+        }
+      }
+      if (c < 2 && board[r][c+1] && board[r][c+1].owner !== owner) {
+        // Right neighbor
+        if (card.values[1] > board[r][c+1].values[3]) {
+          newFlips.push(board[r][c+1]);
+          flipCard(board[r][c+1], owner);
+        }
+      }
+    });
+    // If any new flips happened, continue the combo chain recursively
+    if (newFlips.length > 0) {
+      applyComboChain(newFlips, owner);
+    }
+  }
+  
+  function findCardOnBoard(card) {
+    // Find the board index (0-8) of a given card
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (board[r][c] === card) {
+          return r * 3 + c;
+        }
+      }
+    }
+    return -1;
+  }
+  
+  // --- Basic AI Opponent ---
+  function aiMove() {
+    if (!gameActive || currentPlayer !== 2) return;
+    // Determine the AI's move (very simple strategy: maximize immediate flips)
+    let bestScore = -Infinity;
+    let chosenCard = null;
+    let chosenRow = 0;
+    let chosenCol = 0;
+    // Loop through all possible moves
+    player2Hand.forEach(card => {
+      for (let pos = 0; pos < 9; pos++) {
+        const r = Math.floor(pos / 3);
+        const c = pos % 3;
+        if (board[r][c] !== null) continue;  // skip occupied cells
+        const score = evaluateMove(card, r, c);
+        if (score > bestScore) {
+          bestScore = score;
+          chosenCard = card;
+          chosenRow = r;
+          chosenCol = c;
+        } else if (score === bestScore && score >= 0) {
+          // tie-breaker: randomly choose one of equal scoring moves
+          if (Math.random() < 0.5) {
+            chosenCard = card;
+            chosenRow = r;
+            chosenCol = c;
+          }
+        }
+      }
+    });
+    if (chosenCard) {
+      placeCard(chosenCard, chosenRow, chosenCol);
+    }
+  }
+  
+  function evaluateMove(card, row, col) {
+    // Simulate placing 'card' at (row, col) and calculate how many cards would flip
+    let flipCount = 0;
+    const owner = card.owner;
+    const neighbors = [];
+    if (row > 0 && board[row-1][col]) {
+      neighbors.push({ card: board[row-1][col], placedSide: card.values[0], neighborSide: board[row-1][col].values[2] });
+    }
+    if (row < 2 && board[row+1][col]) {
+      neighbors.push({ card: board[row+1][col], placedSide: card.values[2], neighborSide: board[row+1][col].values[0] });
+    }
+    if (col > 0 && board[row][col-1]) {
+      neighbors.push({ card: board[row][col-1], placedSide: card.values[3], neighborSide: board[row][col-1].values[1] });
+    }
+    if (col < 2 && board[row][col+1]) {
+      neighbors.push({ card: board[row][col+1], placedSide: card.values[1], neighborSide: board[row][col+1].values[3] });
+    }
+    const willFlip = new Set();
+    if (isSameRule()) {
+      const sameMatches = neighbors.filter(n => n.placedSide === n.neighborSide);
+      if (sameMatches.length >= 2) {
+        sameMatches.forEach(n => { if (n.card.owner !== owner) willFlip.add(n.card); });
+      }
+    }
+    if (isPlusRule()) {
+      for (let i = 0; i < neighbors.length; i++) {
+        for (let j = i+1; j < neighbors.length; j++) {
+          const sum1 = neighbors[i].placedSide + neighbors[i].neighborSide;
+          const sum2 = neighbors[j].placedSide + neighbors[j].neighborSide;
+          if (sum1 === sum2) {
+            if (neighbors[i].card.owner !== owner) willFlip.add(neighbors[i].card);
+            if (neighbors[j].card.owner !== owner) willFlip.add(neighbors[j].card);
+          }
+        }
+      }
+    }
+    neighbors.forEach(n => {
+      if (n.card.owner !== owner && n.placedSide > n.neighborSide) {
+        if (!willFlip.has(n.card)) {
+          willFlip.add(n.card);
+        }
+      }
+    });
+    flipCount = willFlip.size;
+    return flipCount;
+  }
+  
+  // --- Helpers for game state ---
+  function isBoardFull() {
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (board[r][c] === null) return false;
+      }
+    }
+    return true;
+  }
+  function updateScore() {
+    let blueCount = 0, redCount = 0;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        const card = board[r][c];
+        if (card) {
+          if (card.owner === 1) blueCount++;
+          if (card.owner === 2) redCount++;
+        }
+      }
+    }
+    scoreDisplay.textContent = `Blue: ${blueCount}, Red: ${redCount}`;
+  }
+  function updateTurnIndicator() {
+    turnIndicator.textContent = `Turn: ${currentPlayer === 1 ? "Blue" : "Red"}`;
+  }
+  function endGame() {
+    gameActive = false;
+    // Tally final score
+    let blueCount = 0, redCount = 0;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        const card = board[r][c];
+        if (card) {
+          if (card.owner === 1) blueCount++;
+          if (card.owner === 2) redCount++;
+        }
+      }
+    }
+    // Determine result
+    let resultText;
+    if (blueCount > redCount) resultText = "Blue wins!";
+    else if (redCount > blueCount) resultText = "Red wins!";
+    else resultText = "Draw!";
+    resultDisplay.textContent = "Game Over – " + resultText;
+  }
+  
+  // Restart button
+  document.getElementById("restart-btn").addEventListener("click", () => {
+    initGame();
+  });
+  
+  // Initialize the game on page load
+  initGame();
+</script>
+
+</body>
+</html>
